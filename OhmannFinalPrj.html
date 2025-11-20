@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <!--The viewport meta tag is used to improve the presentation and behavior of the samples on iOS devices-->
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+    <title>Real Time EPA Air Quality Index Data</title>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.26/esri/themes/light/main.css"/>
+    <script src="https://js.arcgis.com/4.26/"></script>
+	<script type="module" src=https://js.arcgis.com/calcite-components/1.0.5/calcite.esm.js></script>
+	<link rel="stylesheet" type="text/css" href=https://js.arcgis.com/calcite-components/1.0.5/calcite.css />
+    <style>
+      html, body, #mapDiv {
+        height: 100%; width: 100%; margin: 0; padding: 0; 
+      }
+	  #panelDiv{
+	  width: 250px;
+	  height: 600px;
+	  border: 1px solid grey;
+	  background-color: #F8F8F8;
+	  padding-top: 10px;
+	  padding-left: 10px;
+	  padding-right: 11px;
+	  }
+	  .esri-search {
+	   border: 1px solid grey;
+		}
+	  .button{
+	  padding-bottom: 10px;
+	  }
+	  #mapDiv{
+        height: 100%
+      }
+			
+	#title{
+		height: 25px;
+		font-size: 12pt;
+		font-weight: bold;
+		background-color: #1E90FF;
+		padding-left: 10px;
+		padding-top: 5px;
+		color: white;
+	}
+			
+			      
+    </style>
+    
+    <script> 
+	  customElements.whenDefined("calcite-button").then(
+				() => {
+	  var legend
+      require([
+        "esri/Map",
+				"esri/views/MapView",
+				"esri/layers/FeatureLayer",
+				"esri/widgets/Search",
+				"esri/PopupTemplate",
+				"esri/widgets/Legend",
+				"esri/smartMapping/renderers/color",
+				"esri/renderers/SimpleRenderer",
+				"esri/widgets/LayerList"
+      ], function(
+				Map, 
+				MapView,
+				FeatureLayer,
+				Search,
+				PopupTemplate,
+				Legend,
+				colorRendererCreator,
+				SimpleRendererCreator,
+				LayerList
+      ) { 
+		let arcgisServerURL= "https://50.17.208.139:6443/arcgis/rest/services";		  
+        //creates a new map with basemap
+        let map = new Map({ 
+          basemap: "osm"
+        });
+				
+				//creates a map view showing the study area
+				let view = new MapView({
+					container: "mapDiv",
+					map: map,
+					center:[-94.5, 38.5],
+					zoom: 4
+					});
+				
+				// Create popup templates
+				let popupTemplateAir = new PopupTemplate({
+					  // autocasts as new PopupTemplate()
+					  title: "Air Quality Report (Ozone and PM 2.5)",
+					  outFields: ["*"],
+					  content: [{
+						type: "fields",
+						fieldInfos: [{
+						  fieldName: "gridcode",
+						  label: "Air Pollution Level:"
+						},{
+						  fieldName: "Timestamp",
+						  label: "Time of sampling:"
+						}]
+					  }]
+					});	
+				let popupTemplateCounties = new PopupTemplate({
+				  // autocasts as new PopupTemplate()
+				  title: "{Geographic_Area_Name} Demographic Information",
+				  outFields: ["*"],
+				  content: [{
+					type: "fields",
+					fieldInfos: [{
+					  fieldName: "POP2021",
+					  label: "2021 Population"
+					},{
+					  fieldName: "PercOver62 ",
+					  label: "Percent Population ≥ 62"
+					},{
+					  fieldName: "HHMedIncome2021",
+					  label: "2021 Household Median Income"
+					}]
+				  }]
+				});
+					
+		
+				// Create all layers layer
+				let editLayer = new FeatureLayer({
+					url: "https://services.arcgis.com/cJ9YHowT8TU7DUyn/ArcGIS/rest/services/AirNowLatestContoursCombined/FeatureServer/0",
+					outFields: ['*'],
+					opacity: 0.60,
+					popupTemplate: popupTemplateAir,
+					
+				});
+				
+				let borderLayer = new FeatureLayer({
+					url: "https://services3.arcgis.com/eyU1lVcSnKSGItET/ArcGIS/rest/services/States_KO/FeatureServer/0",
+					outFields: ['*']
+					});
+					
+				var countyLayer = new FeatureLayer({
+				url: "https://50.17.208.139:6443/arcgis/rest/services/US_Counties_2021/MapServer/0", 
+				outFields:["*"],
+				opacity: 0.5,
+				//title: "U.S. Counties",
+				popupTemplate: popupTemplateCounties
+				});
+
+					
+				// Create graphic layer for search	
+
+				let symbol = {
+					 type: "simple-marker",  // autocasts as new PictureMarkerSymbol()
+					 size: 10,
+					 color: [189, 205, 255]
+						 }
+				var popupTemplate = new PopupTemplate({
+					title: "{NAME}, {ST}"
+					});
+				var cityLayer = new FeatureLayer({
+					url: arcgisServerURL + "/State_Capitals/MapServer/0", 
+					outFields:["*"],
+					popupTemplate: popupTemplate
+					});	
+				
+				
+				map.addMany([countyLayer,editLayer,borderLayer,cityLayer]);
+				
+				// Create widgets
+				legend = new Legend({
+					view: view,
+					layerInfos: [{
+						layer: countyLayer,
+						title: "U.S. Counties"
+					},{
+						layer: editLayer,
+						title: "EPA Air Quality Report",
+					}],
+					container: "legendDiv"
+				});
+				
+				let layerlist = new LayerList({
+				  view: view,
+				  container: "layerDiv",
+				  layerInfos: [{
+						layer: countyLayer,
+						title: "U.S. Counties"
+					},{
+						layer: editLayer,
+						title: "EPA Air Quality Report",
+					}]
+				});
+	 			view.when(()=>{
+					
+					//create search
+					const search = new Search({  
+					view: view,
+					container: "searchDiv",
+					autoSelect:false, //no zoom in, select, popup, and graphic
+					//popupEnabled:false, 
+					//resultGraphicEnabled: false,
+					includeDefaultSources:false, //no default geocoder
+					sources:[ //custom geocoder
+						{
+							url: "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer",
+							singleLineFieldName: "SingleLine",
+							outFields: ["Addr_type", "Score", "Match_Addr"], //return three fields
+							name: "Custom Geocoding Service",
+							placeholder: "Address or Place",
+							resultSymbol: symbol,
+						
+						}],
+					});
+				
+				view.when(()=>{
+					view.ui.add(panelDiv, "top-right");
+				});
+				
+				var featureCollection
+				var feature
+				console.log(feature)
+				search.on("search-start", (response)=>{
+					view.graphics.removeAll();
+				});
+				search.on("search-complete", (response)=>{
+					 //console.log(response);
+					 featureCollection=[];
+					 console.log(featureCollection)
+					 
+					//Go through each searching result of the first source (geocoder)
+					response.results[0].results.forEach((result)=>{
+						feature = result.feature;
+						console.log(feature);
+						feature.symbol = symbol;
+						//feature.popupTemplate = popupTemplate;
+						//show the features on the map view
+						view.graphics.add(feature);
+						//used for the extent of the view goto target
+						featureCollection.push(result.target);
+					})
+					//Move the map view to all of the searching results 
+					view.goTo({target:featureCollection});
+				});
+				
+				});
+			document.getElementById('run').addEventListener('click',()=>{
+				var e = document.getElementById("attrList")	
+				var x = document.getElementById("classList")	
+				classSel = x.value
+				attrSel = 	e.value
+				let rendererParams = {
+					layer: countyLayer,
+					//normalizationType: "log",
+					view: view,
+					classificationMethod: classSel,
+					field: attrSel,
+					theme: "above-and-below",
+					numClasses: 5
+				}
+				colorRendererCreator.createClassBreaksRenderer(rendererParams).then(function(response){
+				countyLayer.renderer = response.renderer;
+				view.graphics.removeAll();
+				map.add(countyLayer)
+				map.add(editLayer)
+				});
+			});
+				
+    });
+	})
+    </script>
+  </head>
+  <body>   
+	<calcite-shell>
+	<div id="title" slot = "header">Real-Time EPA Air Quality Index Data (Ground Level Ozone and Particulate Matter)</div>
+	<div id = "panelDiv">
+	<calcite-panel id = "controlPanel" heading = "Air Quality Information">
+	<calcite-block heading = "Search an address" collapsible closed>
+		<calcite-icon scale="s" slot="icon" icon="search"></calcite-icon>
+		<div id = "searchDiv"></div>
+	</calcite-block>
+	<calcite-block heading = "Legend" collapsible open>
+		<calcite-icon scale="s" slot="icon" icon="legend"></calcite-icon>
+		<div id = "legendDiv"></div>
+	</calcite-block>
+	<calcite-block heading = "Symbology" collapsible closed>
+		<calcite-icon scale="s" slot="icon" icon="palette"></calcite-icon>
+		<calcite-label>Choose an Attribute of the County Layer
+					<calcite-select id = 'attrList' label = 'dropdown'>
+							<calcite-option id ="attr" value = "logPop">2021 Population</calcite-option>
+							<calcite-option id="attr" value = "HHIncomeMedInt">2021 Median Household Income</calcite-option>
+							<calcite-option id="attr" value = "logPopELD">2021 Population over 62 years old</calcite-option>
+					</calcite-select>	</calcite-label>
+		<calcite-label>Choose a Classification Method
+			<calcite-select id = 'classList' label = 'dropdown'>
+							<calcite-option value = "natural-breaks" id ="attr">Natural Breaks</calcite-option>
+							<calcite-option value = "standard-deviation" id="attr">Standard Deviation</calcite-option>
+							<calcite-option value = "quantile" id="attr">Quantile</calcite-option>
+			</calcite-select> </calcite-label>
+			<div style="display: flex; flex-direction: row">
+				
+				<calcite-button style = "padding-right: 10px" width= "full" class = "button" id = "run">Apply</calcite-button>
+			</div>
+	</calcite-block>
+	<calcite-block heading = "Layer List" collapsible closed>
+	<calcite-icon scale="s" slot="icon" icon="layers"></calcite-icon>
+	<div id = "layerDiv"></div>
+	</calcite-block>
+	</calcite-panel>
+	</div>
+     <div id="mapDiv"></div>
+	 <div id="tableDiv"></div>
+	</calcite-shell>	 
+  </body>
+</html>
